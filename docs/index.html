@@ -189,7 +189,7 @@
     <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800 muted">
       <div class="text-slate-400 text-sm" data-i18n="plans.premium">Premium</div>
       <div class="text-2xl font-bold">
-        <span id="pricePremium">159</span> THB <span id="unitPremium" class="text-base text-slate-400">/ month</span>
+        <span id="pricePremium">79</span> THB <span id="unitPremium" class="text-base text-slate-400">/ month</span>
       </div>
       <ul class="mt-3 text-sm list-disc list-inside text-slate-300">
         <li data-i18n="feature.alerts_history">Alerts + trip history</li>
@@ -203,7 +203,7 @@
       <div class="flex items-center justify-between">
         <div>
           <div class="text-indigo-300 text-sm" data-i18n="plans.family">Family</div>
-          <div class="text-2xl font-bold"><span id="priceFamily">559</span> THB <span id="unitFamily" class="text-sm text-indigo-200">/ month</span></div>
+          <div class="text-2xl font-bold"><span id="priceFamily">249</span> THB <span id="unitFamily" class="text-sm text-indigo-200">/ month</span></div>
         </div>
         <span class="text-xs px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-600" id="badgeUpTo">Up to 6 users</span>
       </div>
@@ -758,7 +758,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* Pricing */
-  const PRICING={ premium:159, family:559 };
+  const PRICING={ premium:79, family:249 };
   let billing="monthly";
   const calc = m => billing==="monthly" ? m : (m*12 - m*2);
   function refreshPrice(){
