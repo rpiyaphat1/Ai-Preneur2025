@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChonLaew – Demo (i18n)</title>
+
+  <!-- Icons -->
+  <link rel="icon" href="./assets/logo.png" sizes="any">
+  <link rel="apple-touch-icon" href="./assets/logo.png">
+  <meta name="theme-color" content="#111827">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    body { background:#0f172a; }
+    .screen{ display:none; } .screen.active{ display:block; }
+    .demo-disabled{ opacity:.6; pointer-events:none; }
+    button{ cursor:pointer; }
+    #liveMap,#familyMap{ height:240px; border-radius:16px; overflow:hidden; }
+    .leaflet-container{ background:#0b1220; z-index:0; }
+
+    .avatar{ width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #22c55e; background:#1f2937; }
+
+    nav .menu-btn{ display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 6px; color:#94a3b8; }
+    nav .menu-btn .label{ font-size:13px; }
+    nav .menu-btn svg{ width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; }
+    nav .menu-btn.active{ color:#60a5fa; }
+
+    .family-map-blurred{ filter:blur(4px) brightness(0.6); pointer-events:none; }
+    #familyGate{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; padding:1rem; }
+    #familyGate.visible{ display:flex; }
+
+    .toggle-pill{ border:1px solid #334155; border-radius:999px; padding:4px; background:#0b1220; display:inline-flex; gap:4px; }
+    .toggle-pill button{ padding:6px 12px; border-radius:999px; font-weight:600; font-size:12px; color:#94a3b8; }
+    .toggle-pill button.active{ background:#1f2937; color:#e5e7eb; border:1px solid #475569; }
+
+    .muted{ opacity:.6; }
+    .input{ background:#0b1220; border:1px solid #334155; color:#e5e7eb; padding:.6rem .8rem; border-radius:.8rem; width:100%; }
+    .pill{ padding:.35rem .6rem; border-radius:999px; font-size:.75rem; }
+
+    .slide-container{
+      position:relative; background:#1e293b; height:60px; border-radius:999px;
+      display:flex; align-items:center; padding:5px; overflow:hidden; border:1px solid #334155; user-select:none;
+    }
+    .slide-btn{
+      position:absolute; height:50px; width:50px; border-radius:50%; background:#ef4444;
+      display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700;
+      box-shadow:0 6px 16px rgba(239,68,68,.35); touch-action:none;
+    }
+    .slide-text{ width:100%; text-align:center; color:#cbd5e1; font-size:14px; pointer-events:none; }
+
+    .modal-z{ z-index:1000; }
+    .is-hidden{ display:none !important; pointer-events:none !important; }
+  </style>
+</head>
+<body class="text-slate-100">
+<main class="max-w-sm mx-auto min-h-[100dvh] flex flex-col">
+
+  <!-- Top bar -->
+  <header class="px-4 py-3 flex items-center justify-between bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <img src="./assets/logo.png" alt="ChonLaew" class="w-7 h-7 rounded-md">
+      <h1 class="font-bold" data-i18n="app.name">ChonLaew</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="btnLang" class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs">
+        🌐 <span id="langLabel">TH</span>
+      </button>
+      <span id="statusBadge" class="px-3 py-1 rounded-full text-xs bg-amber-200/20 text-amber-300" data-i18n="badge.demo">Demo</span>
+    </div>
+  </header>
+
+  <!-- Welcome -->
+  <section id="welcome" class="screen active p-5 space-y-5">
+    <div class="bg-slate-900 rounded-3xl p-6 border border-slate-800">
+      <h2 class="text-center text-xl font-bold" data-i18n="welcome.title">Welcome to ChonLaew</h2>
+      <p class="text-center text-slate-300 mt-1 text-sm" data-i18n="welcome.subtitle">Login/Register disabled in demo</p>
+      <div class="mt-6 space-y-3">
+        <button class="w-full py-3 rounded-2xl bg-indigo-600 demo-disabled" data-i18n="btn.login">Log in</button>
+        <button class="w-full py-3 rounded-2xl bg-slate-700 demo-disabled" data-i18n="btn.register">Register</button>
+        <button id="btnSkip" class="w-full py-3 rounded-2xl bg-emerald-600 text-white font-semibold" data-link="#dashboard" data-i18n="btn.continue_guest">Continue as Guest</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="dashboard" class="screen p-4 space-y-4">
+    <div class="bg-slate-900 rounded-3xl p-4 border border-slate-800">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold" data-i18n="dashboard.title">Real-time Monitoring</h3>
+        <span class="text-xs px-2 py-1 rounded-full bg-amber-400/10 text-amber-200" data-i18n="dashboard.badge">Countdown only</span>
+      </div>
+
+      <div class="grid place-items-center my-4">
+        <button id="btnSOS" class="w-40 h-40 rounded-full bg-rose-600 text-white text-3xl font-black" data-i18n="btn.sos">SOS</button>
+        <p class="text-sm text-slate-400 mt-3" data-i18n="dashboard.sos_hint">10-second safety countdown</p>
+      </div>
+
+      <div class="text-sm text-slate-400 mb-2 flex items-center justify-between">
+        <span data-i18n="dashboard.location">Location</span>
+        <span id="gpsBadge" class="text-emerald-300 text-xs" data-i18n="dashboard.gps_waiting">Waiting...</span>
+      </div>
+      <div id="liveMap" class="bg-slate-800"></div>
+
+      <div class="mt-4 grid grid-cols-2 gap-2">
+        <button id="btnStart" class="py-3 rounded-2xl bg-indigo-600 text-white font-semibold" data-i18n="btn.start">Start</button>
+        <button id="btnStop" class="py-3 rounded-2xl bg-slate-700 text-slate-100 font-semibold" disabled data-i18n="btn.stop">Stop</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Settings (Account) -->
+  <section id="settings" class="screen p-4 space-y-4">
+    <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800 flex items-center gap-4">
+      <img id="profileAvatar" src="" class="w-16 h-16 rounded-full border-2 border-indigo-500 object-cover" alt="avatar">
+      <div class="flex-1">
+        <div class="font-semibold text-lg" id="displayNameText">You</div>
+        <div class="text-sm text-slate-400" data-i18n="settings.guest">Guest Mode</div>
+      </div>
+      <span class="pill bg-slate-800 border border-slate-700 text-slate-300" data-i18n="settings.account">Account</span>
+    </div>
+
+    <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800 space-y-4">
+      <h3 class="font-semibold" data-i18n="settings.title">Account Settings</h3>
+      <div>
+        <label class="text-sm text-slate-300" data-i18n="settings.display_name">Display name</label>
+        <input id="inpName" class="input mt-1" placeholder="Your name" />
+      </div>
+      <div>
+        <label class="text-sm text-slate-300" data-i18n="settings.photo">Profile photo</label>
+        <div class="mt-2 flex items-center gap-3">
+          <img id="avatarPreview" class="w-16 h-16 rounded-full object-cover border border-slate-600" alt="preview">
+          <div class="space-x-2">
+            <label class="inline-block px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer">
+              <input id="inpPhoto" type="file" accept="image/*" class="hidden"><span data-i18n="btn.upload">Upload…</span>
+            </label>
+            <button id="btnRemovePhoto" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700" data-i18n="btn.remove">Remove</button>
+          </div>
+        </div>
+        <p class="text-xs text-slate-400 mt-2" data-i18n="settings.photo_note">Stored locally (localStorage)</p>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btnSaveAccount" class="py-3 rounded-2xl bg-emerald-600 text-white font-semibold" data-i18n="btn.save">Save</button>
+        <button id="btnResetAccount" class="py-3 rounded-2xl bg-slate-700 text-slate-100" data-i18n="btn.reset">Reset</button>
+      </div>
+    </div>
+
+    <button id="btnLogout" class="py-3 rounded-2xl bg-rose-600 text-white" data-i18n="btn.logout">Log Out</button>
+  </section>
+
+  <!-- Alert -->
+  <section id="alert" class="screen p-4">
+    <div class="bg-slate-900 rounded-3xl p-6 border border-slate-800 text-center space-y-5">
+      <div class="text-slate-200" data-i18n="alert.are_you_ok">Are you okay?</div>
+      <div class="text-6xl font-black text-amber-300"><span id="bigCountdown">10</span></div>
+      <div class="text-slate-400 text-sm" data-i18n="alert.demo_hint">Demo mode: slide to confirm emergency</div>
+
+      <div class="slide-container" id="slideArea">
+        <div class="slide-btn" id="slideBtn">➡</div>
+        <div class="slide-text" data-i18n="alert.slide_text">Slide to confirm emergency</div>
+      </div>
+
+      <button id="btnCancelAlert" class="w-full py-3 rounded-2xl bg-emerald-600 text-white" data-i18n="btn.im_ok">I'm OK</button>
+    </div>
+  </section>
+
+  <!-- Subscription -->
+  <section id="subscription" class="screen p-4 space-y-4">
+    <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800 flex items-center justify-between">
+      <div><h3 class="font-bold" data-i18n="plans.title">Plans</h3><div class="text-xs text-slate-400" data-i18n="plans.select_billing">Select billing</div></div>
+      <div class="toggle-pill">
+        <button id="btnMonthly" class="active" data-i18n="plans.monthly">Monthly</button>
+        <button id="btnYearly" data-i18n="plans.yearly">Yearly</button>
+      </div>
+    </div>
+
+    <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800 muted">
+      <div class="text-slate-400 text-sm" data-i18n="plans.free">Free</div>
+      <div class="text-2xl font-bold"><span id="priceFree">0</span> THB <span class="text-base text-slate-400" data-i18n="plans.forever">/ forever</span></div>
+      <ul class="mt-3 text-sm list-disc list-inside text-slate-300"><li data-i18n="feature.alerts">Accident alerts</li></ul>
+      <button class="mt-3 w-full py-3 rounded-2xl bg-slate-800 cursor-not-allowed" data-i18n="plans.current_family">Current plan: Family</button>
+    </div>
+
+    <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800 muted">
+      <div class="text-slate-400 text-sm" data-i18n="plans.premium">Premium</div>
+      <div class="text-2xl font-bold">
+        <span id="pricePremium">159</span> THB <span id="unitPremium" class="text-base text-slate-400">/ month</span>
+      </div>
+      <ul class="mt-3 text-sm list-disc list-inside text-slate-300">
+        <li data-i18n="feature.alerts_history">Alerts + trip history</li>
+        <li data-i18n="feature.private_share">Private location sharing</li>
+      </ul>
+      <button class="mt-3 w-full py-3 rounded-2xl bg-slate-800 cursor-not-allowed" data-i18n="plans.current_family">Current plan: Family</button>
+    </div>
+
+    <div class="relative p-4 bg-indigo-950/40 rounded-3xl border-2 border-indigo-500 shadow-lg">
+      <div class="absolute -top-3 right-3 px-2 py-1 bg-indigo-600 text-[11px] rounded-full text-white" data-i18n="plans.current_plan">Current Plan</div>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-indigo-300 text-sm" data-i18n="plans.family">Family</div>
+          <div class="text-2xl font-bold"><span id="priceFamily">559</span> THB <span id="unitFamily" class="text-sm text-indigo-200">/ month</span></div>
+        </div>
+        <span class="text-xs px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-600" id="badgeUpTo">Up to 6 users</span>
+      </div>
+      <ul class="mt-3 text-sm list-disc list-inside text-indigo-100">
+        <li data-i18n="feature.all_premium">All premium features</li>
+        <li data-i18n="feature.family_map">Realtime family map</li>
+        <li data-i18n="feature.shared_history">Shared trip history</li>
+      </ul>
+      <button class="mt-3 w-full py-3 rounded-2xl bg-indigo-600/30 text-indigo-200 cursor-not-allowed" data-i18n="plans.active">Active</button>
+    </div>
+  </section>
+
+  <!-- Family -->
+  <section id="family" class="screen p-4 space-y-4">
+    <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800 relative">
+      <h3 class="font-semibold" data-i18n="family.map">Family Map</h3>
+      <div class="absolute right-4 top-4">
+        <button id="btnAddPOI" class="px-3 py-1 rounded-xl bg-indigo-600 text-white text-sm shadow" data-i18n="btn.add_plus">Add +</button>
+      </div>
+      <div id="familyMap" class="mt-3 bg-slate-800 family-map-blurred"></div>
+      <div id="familyGate" class="z-10">
+        <div class="bg-slate-900/90 rounded-2xl p-4 text-center border border-slate-700">
+          <div class="font-semibold mb-1" data-i18n="family.enable_title">Enable Location</div>
+          <p class="text-sm text-slate-400 mb-2" data-i18n="family.enable_desc">Turn on location to view family</p>
+          <button id="btnEnableLocation" class="w-full py-2 rounded-xl bg-emerald-600 text-white" data-i18n="btn.enable">Enable</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-slate-400 text-sm" data-i18n="family.members">Family Members</div>
+        <button id="btnManageFamily" class="px-3 py-1 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-sm" data-i18n="btn.settings">Settings</button>
+      </div>
+      <div id="familyList" class="flex gap-3 overflow-x-auto pb-1"></div>
+    </div>
+
+    <div class="p-4 bg-slate-900 rounded-3xl border border-slate-800">
+      <div class="text-slate-400 text-sm mb-2" data-i18n="family.feed">Family Feed</div>
+      <div id="feed" class="space-y-2 text-sm"></div>
+    </div>
+  </section>
+
+  <!-- Bottom nav -->
+  <nav class="mt-auto sticky bottom-0 bg-slate-900/90 backdrop-blur border-t border-slate-800">
+    <div class="max-w-sm mx-auto grid grid-cols-4 text-center">
+      <button class="menu-btn" data-link="#dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg><div class="label" data-i18n="nav.dashboard">Dashboard</div></button>
+      <button class="menu-btn" data-link="#settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="8"/></svg><div class="label" data-i18n="nav.settings">Settings</div></button>
+      <button class="menu-btn" data-link="#subscription"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 10h8M8 14h6"/></svg><div class="label" data-i18n="nav.plans">Plans</div></button>
+      <button class="menu-btn" data-link="#family"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.5"/><path d="M3.5 19c0-3.3 3-6 6.5-6s6.5 2.7 6.5 6"/><circle cx="17" cy="10" r="2.5"/></svg><div class="label" data-i18n="nav.family">Family</div></button>
+    </div>
+  </nav>
+</main>
+
+<!-- Logout confirm modal -->
+<div id="logoutModal" class="fixed inset-0 bg-black/60 is-hidden items-center justify-center p-4 modal-z">
+  <div class="bg-slate-900 rounded-2xl p-6 border border-slate-700 max-w-sm w-full space-y-4 text-center">
+    <p class="text-lg font-semibold" data-i18n="logout.title">Log out?</p>
+    <p class="text-slate-400 text-sm" data-i18n="logout.desc">Do you want to sign out?</p>
+    <div class="grid grid-cols-2 gap-3 mt-4">
+      <button id="cancelLogout" class="py-2 rounded-xl bg-slate-700 text-white" data-i18n="btn.cancel">Cancel</button>
+      <button id="confirmLogout" class="py-2 rounded-xl bg-rose-600 text-white font-semibold" data-i18n="btn.logout">Log Out</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Family modal -->
+<div id="manageFamilyModal" class="fixed inset-0 bg-black/60 is-hidden items-center justify-center p-4 modal-z">
+  <div class="bg-slate-900 rounded-2xl p-6 border border-slate-700 max-w-sm w-full">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold" data-i18n="manage.title">Manage Family (Up to 6 users)</h3>
+      <button id="closeManageFamily" class="px-2 py-1 rounded-md bg-slate-800 border border-slate-700" data-i18n="btn.close">Close</button>
+    </div>
+
+    <div class="space-y-3">
+      <div>
+        <label class="text-sm text-slate-300" data-i18n="manage.name">Name</label>
+        <input id="mfName" class="input mt-1" placeholder="e.g., Mom" />
+      </div>
+      <div>
+        <label class="text-sm text-slate-300" data-i18n="manage.gmail">Gmail</label>
+        <input id="mfEmail" class="input mt-1" placeholder="someone@gmail.com" />
+      </div>
+      <button id="btnAddMember" class="w-full py-2 rounded-xl bg-emerald-600 text-white font-semibold" data-i18n="manage.add_member">Add member</button>
+      <p class="text-xs text-slate-400" data-i18n="manage.note">Note: maximum 6 users (including you)</p>
+    </div>
+
+    <div class="mt-4">
+      <div class="text-sm text-slate-400 mb-1" data-i18n="manage.current">Current members</div>
+      <div id="memberList" class="space-y-2 max-h-56 overflow-auto"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  /* ================== i18n ================== */
+  const LANG_KEY = "chonlaew_lang";
+  const $ = (id) => document.getElementById(id);
+  const tdict = {
+    th: {
+      "app.name":"ChonLaew",
+      "badge.demo":"เดโม",
+      "welcome.title":"ยินดีต้อนรับสู่ ChonLaew",
+      "welcome.subtitle":"ปิดการล็อกอิน/สมัครชั่วคราว (เดโม)",
+      "btn.login":"เข้าสู่ระบบ",
+      "btn.register":"สมัครสมาชิก",
+      "btn.continue_guest":"ใช้งานแบบผู้เยี่ยมชม",
+      "dashboard.title":"ติดตามแบบเรียลไทม์",
+      "dashboard.badge":"โหมดนับถอยหลัง",
+      "btn.sos":"ขอความช่วยเหลือ",
+      "dashboard.sos_hint":"นับถอยหลังความปลอดภัย 10 วินาที",
+      "dashboard.location":"ตำแหน่ง",
+      "dashboard.gps_waiting":"กำลังรอ…",
+      "btn.start":"เริ่ม",
+      "btn.stop":"หยุด",
+      "settings.guest":"โหมดผู้เยี่ยมชม",
+      "settings.account":"บัญชี",
+      "settings.title":"การตั้งค่าบัญชี",
+      "settings.display_name":"ชื่อที่แสดง",
+      "settings.photo":"รูปโปรไฟล์",
+      "btn.upload":"อัปโหลด…",
+      "btn.remove":"ลบรูป",
+      "settings.photo_note":"รูปจะเก็บไว้ในเครื่องเท่านั้น (localStorage)",
+      "btn.save":"บันทึก",
+      "btn.reset":"รีเซ็ต",
+      "btn.logout":"ออกจากระบบ",
+      "alert.are_you_ok":"คุณโอเคไหม?",
+      "alert.demo_hint":"โหมดเดโม: เลื่อนเพื่อยืนยันเหตุฉุกเฉิน",
+      "alert.slide_text":"เลื่อนเพื่อยืนยันเหตุฉุกเฉิน",
+      "btn.im_ok":"ฉันปลอดภัย",
+      "plans.title":"แพ็กเกจ",
+      "plans.select_billing":"เลือกรูปแบบการเรียกเก็บเงิน",
+      "plans.monthly":"รายเดือน",
+      "plans.yearly":"รายปี",
+      "plans.free":"ฟรี",
+      "plans.forever":"/ ตลอดไป",
+      "feature.alerts":"แจ้งเตือนอุบัติเหตุ",
+      "plans.current_family":"แพ็กเกจปัจจุบัน: ครอบครัว",
+      "plans.premium":"พรีเมียม",
+      "feature.alerts_history":"แจ้งเตือน + ประวัติการเดินทาง",
+      "feature.private_share":"แบ่งปันตำแหน่งแบบส่วนตัว",
+      "plans.current_plan":"แพ็กเกจปัจจุบัน",
+      "plans.family":"ครอบครัว",
+      "feature.all_premium":"ฟีเจอร์พรีเมียมทั้งหมด",
+      "feature.family_map":"แผนที่ครอบครัวแบบเรียลไทม์",
+      "feature.shared_history":"ประวัติร่วมกันของครอบครัว",
+      "plans.active":"ใช้งานอยู่",
+      "family.map":"แผนที่ครอบครัว",
+      "btn.add_plus":"เพิ่ม +",
+      "family.enable_title":"เปิดตำแหน่ง",
+      "family.enable_desc":"เปิดตำแหน่งเพื่อดูสมาชิกครอบครัว",
+      "btn.enable":"เปิดใช้งาน",
+      "family.members":"สมาชิกครอบครัว",
+      "btn.settings":"ตั้งค่า",
+      "family.feed":"ฟีดครอบครัว",
+      "nav.dashboard":"หน้าหลัก",
+      "nav.settings":"ตั้งค่า",
+      "nav.plans":"แพ็กเกจ",
+      "nav.family":"ครอบครัว",
+      "logout.title":"ออกจากระบบ?",
+      "logout.desc":"ต้องการออกจากแอปหรือไม่",
+      "btn.cancel":"ยกเลิก",
+      "btn.close":"ปิด",
+      "manage.title":"จัดการสมาชิก (สูงสุด 6 คน)",
+      "manage.name":"ชื่อ",
+      "manage.gmail":"อีเมล Gmail",
+      "manage.add_member":"เพิ่มสมาชิก",
+      "manage.note":"หมายเหตุ: รวมคุณแล้วได้สูงสุด 6 คน",
+      "manage.current":"สมาชิกปัจจุบัน",
+      "tag.owner":"เจ้าของ",
+      "member.active":"ออนไลน์",
+      "badge.up_to":"สูงสุด {n} คน",
+      "list.more":"+{n} คน",
+      "list.in_family":"ในครอบครัว"
+    },
+    en: {
+      "app.name":"ChonLaew",
+      "badge.demo":"Demo",
+      "welcome.title":"Welcome to ChonLaew",
+      "welcome.subtitle":"Login/Register disabled in demo",
+      "btn.login":"Log in",
+      "btn.register":"Register",
+      "btn.continue_guest":"Continue as Guest",
+      "dashboard.title":"Real-time Monitoring",
+      "dashboard.badge":"Countdown only",
+      "btn.sos":"SOS",
+      "dashboard.sos_hint":"10-second safety countdown",
+      "dashboard.location":"Location",
+      "dashboard.gps_waiting":"Waiting...",
+      "btn.start":"Start",
+      "btn.stop":"Stop",
+      "settings.guest":"Guest Mode",
+      "settings.account":"Account",
+      "settings.title":"Account Settings",
+      "settings.display_name":"Display name",
+      "settings.photo":"Profile photo",
+      "btn.upload":"Upload…",
+      "btn.remove":"Remove",
+      "settings.photo_note":"Stored locally (localStorage)",
+      "btn.save":"Save",
+      "btn.reset":"Reset",
+      "btn.logout":"Log Out",
+      "alert.are_you_ok":"Are you okay?",
+      "alert.demo_hint":"Demo mode: slide to confirm emergency",
+      "alert.slide_text":"Slide to confirm emergency",
+      "btn.im_ok":"I'm OK",
+      "plans.title":"Plans",
+      "plans.select_billing":"Select billing",
+      "plans.monthly":"Monthly",
+      "plans.yearly":"Yearly",
+      "plans.free":"Free",
+      "plans.forever":"/ forever",
+      "feature.alerts":"Accident alerts",
+      "plans.current_family":"Current plan: Family",
+      "plans.premium":"Premium",
+      "feature.alerts_history":"Alerts + trip history",
+      "feature.private_share":"Private location sharing",
+      "plans.current_plan":"Current Plan",
+      "plans.family":"Family",
+      "feature.all_premium":"All premium features",
+      "feature.family_map":"Realtime family map",
+      "feature.shared_history":"Shared trip history",
+      "plans.active":"Active",
+      "family.map":"Family Map",
+      "btn.add_plus":"Add +",
+      "family.enable_title":"Enable Location",
+      "family.enable_desc":"Turn on location to view family",
+      "btn.enable":"Enable",
+      "family.members":"Family Members",
+      "btn.settings":"Settings",
+      "family.feed":"Family Feed",
+      "nav.dashboard":"Dashboard",
+      "nav.settings":"Settings",
+      "nav.plans":"Plans",
+      "nav.family":"Family",
+      "logout.title":"Log out?",
+      "logout.desc":"Do you want to sign out?",
+      "btn.cancel":"Cancel",
+      "btn.close":"Close",
+      "manage.title":"Manage Family (Up to 6 users)",
+      "manage.name":"Name",
+      "manage.gmail":"Gmail",
+      "manage.add_member":"Add member",
+      "manage.note":"Note: maximum 6 users (including you)",
+      "manage.current":"Current members",
+      "tag.owner":"Owner",
+      "member.active":"Active",
+      "badge.up_to":"Up to {n} users",
+      "list.more":"+{n} more",
+      "list.in_family":"in family"
+    }
+  };
+  let curLang = localStorage.getItem(LANG_KEY) || "th";
+  const setLang = (lng) => { curLang = lng; localStorage.setItem(LANG_KEY, lng); document.documentElement.lang = lng; $("langLabel").textContent = lng.toUpperCase(); applyI18n(); refreshPrice(); renderFamilyCards(); updateFamilyMap(userLatLng || defaultLatLng); };
+  const tr = (key, vars={})=>{
+    const raw = (tdict[curLang] && tdict[curLang][key]) || key;
+    return raw.replace(/\{(\w+)\}/g, (_,k)=> (vars[k]!==undefined? vars[k] : `{${k}}`));
+  };
+  const applyI18n = ()=>{
+    document.querySelectorAll("[data-i18n]").forEach(el=>{
+      const k = el.getAttribute("data-i18n");
+      el.textContent = tr(k);
+    });
+    // units for plans
+    $("unitPremium") && ( $("unitPremium").textContent = (curLang==="th" ? "/ เดือน" : "/ month") );
+    $("unitFamily")  && ( $("unitFamily").textContent  = (curLang==="th" ? "/ เดือน" : "/ month") );
+    // badge "Up to 6 users"
+    const badgeUpTo = $("badgeUpTo");
+    if(badgeUpTo) badgeUpTo.textContent = tr("badge.up_to",{n:6});
+  };
+  $("btnLang").addEventListener("click", ()=> setLang(curLang==="th" ? "en" : "th"));
+  $("langLabel").textContent = curLang.toUpperCase();
+
+  /* ================== App (เหมือนเวอร์ชันเสถียร) ================== */
+  const defaultLatLng=[13.736717,100.523186];
+  let userLatLng=null, map,userMarker,accuracyCircle,familyMap,familyGroup,familyPoiGroup;
+  let watchId=null, lastPos=null, running=false, poiPlaceLabel=null;
+
+  const DEFAULT_AVATAR = `data:image/svg+xml;utf8,` + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+      <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#334155"/><stop offset="100%" stop-color="#0f172a"/></linearGradient></defs>
+      <rect width="256" height="256" rx="128" ry="128" fill="url(#g)"/>
+      <circle cx="128" cy="98" r="46" fill="#94a3b8"/>
+      <path d="M40 212c8-46 44-74 88-74s80 28 88 74" fill="#94a3b8"/>
+    </svg>
+  `);
+
+  /* Account */
+  const ACC_KEY="chonlaew_account";
+  let displayName="You";
+  let avatarData=DEFAULT_AVATAR;
+
+  function loadAccount(){
+    try{
+      const raw=localStorage.getItem(ACC_KEY);
+      if(raw){
+        const {name, avatar}=JSON.parse(raw);
+        displayName = name || "You";
+        avatarData  = avatar || DEFAULT_AVATAR;
+      }
+    }catch{}
+    $("inpName") && ($("inpName").value = displayName);
+    $("avatarPreview") && ( $("avatarPreview").src = avatarData );
+    $("profileAvatar") && ( $("profileAvatar").src = avatarData );
+    $("displayNameText") && ( $("displayNameText").textContent = displayName );
+  }
+  function saveAccount(){
+    displayName = ($("inpName")?.value || "").trim() || "You";
+    $("displayNameText") && ( $("displayNameText").textContent = displayName );
+    $("profileAvatar") && ( $("profileAvatar").src = avatarData );
+    $("avatarPreview") && ( $("avatarPreview").src = avatarData );
+    localStorage.setItem(ACC_KEY, JSON.stringify({name:displayName, avatar:avatarData}));
+    renderFamilyCards(); updateFamilyMap(userLatLng || defaultLatLng);
+  }
+
+  /* Family store */
+  const FAMILY_KEY="chonlaew_family_members";
+  let familyOthers = [];
+  function loadFamily(){
+    try{ familyOthers = JSON.parse(localStorage.getItem(FAMILY_KEY)||"[]"); }
+    catch{ familyOthers=[]; }
+  }
+  function saveFamily(){ localStorage.setItem(FAMILY_KEY, JSON.stringify(familyOthers)); }
+
+  /* Navigation */
+  function showScreen(id){
+    document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+    const el=document.querySelector(id);
+    el && el.classList.add("active");
+    document.querySelectorAll(".menu-btn").forEach(b=>b.classList.toggle("active",b.dataset.link===id));
+    if(id==="#family") refreshFamilyGate();
+    setTimeout(()=>{ map?.invalidateSize(); familyMap?.invalidateSize(); },80);
+  }
+  document.addEventListener("click",(e)=>{
+    const btn = e.target.closest("[data-link]");
+    if(btn){
+      e.preventDefault();
+      const link=btn.getAttribute("data-link");
+      showScreen(link);
+      if(btn.id==="btnSkip"){
+        startGeo(); running=true; $("btnStart") && ($("btnStart").disabled=true); $("btnStop") && ($("btnStop").disabled=false);
+      }
+    }
+  });
+  window.addEventListener("hashchange",()=>showScreen(location.hash||"#welcome"));
+
+  /* Maps */
+  function initLiveMap(){
+    if(map) return;
+    const el = $("liveMap"); if(!el) return;
+    map=L.map(el,{zoomControl:false,attributionControl:false}).setView(defaultLatLng,14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+    userMarker=L.marker(defaultLatLng).addTo(map);
+    accuracyCircle=L.circle(defaultLatLng,{radius:50,color:"#60a5fa",fillColor:"#60a5fa",fillOpacity:0.15}).addTo(map);
+  }
+  function initFamilyMap(){
+    if(familyMap) return;
+    const el=$("familyMap"); if(!el) return;
+    familyMap=L.map(el,{zoomControl:false,attributionControl:false}).setView(defaultLatLng,14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(familyMap);
+    familyGroup=L.featureGroup().addTo(familyMap);
+    ensurePoiGroup(); attachFamilyMapClick();
+  }
+
+  /* UI Helpers */
+  function escapeHtml(s){ return (s||"").replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function markerHTML(img,size=40,border="#22c55e"){
+    return `<div style="transform:translate(-50%,-50%);width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;border:3px solid ${border};background:#111827;">
+      <img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+    </div>`;
+  }
+  const OFFSETS = [[.0012,.0008],[-.0009,-.0011],[.0010,-.0007],[.0006,.0011],[-.0011,.0005]];
+  function scatterLatLng(center, idx){ const [lat,lng]=center; const o=OFFSETS[idx % OFFSETS.length]; return [lat+o[0], lng+o[1]]; }
+
+  /* Family list (always 4 cards max + “+N more”) */
+  function renderFamilyCards(){
+    const wrap=$("familyList"); if(!wrap) return;
+    wrap.innerHTML="";
+    // me
+    wrap.insertAdjacentHTML("beforeend", `
+      <div class="min-w-[92px] p-3 rounded-2xl bg-slate-800 text-center">
+        <img src="${avatarData}" class="avatar mx-auto mb-2 w-[72px] h-[72px]" alt="${escapeHtml(displayName)}">
+        <div class="text-xs font-medium truncate">${escapeHtml(displayName)}</div>
+        <div class="text-[10px] text-slate-400">${tr("member.active")}</div>
+      </div>
+    `);
+    const othersToShow = familyOthers.slice(0,3);
+    othersToShow.forEach(m=>{
+      wrap.insertAdjacentHTML("beforeend", `
+        <div class="min-w-[92px] p-3 rounded-2xl bg-slate-800 text-center">
+          <img src="${DEFAULT_AVATAR}" class="avatar mx-auto mb-2 w-[72px] h-[72px]" alt="${escapeHtml(m.name)}">
+          <div class="text-xs font-medium truncate">${escapeHtml(m.name)}</div>
+          <div class="text-[10px] text-slate-400">${tr("member.active")}</div>
+        </div>
+      `);
+    });
+    const more = familyOthers.length - othersToShow.length;
+    if(more>0){
+      wrap.insertAdjacentHTML("beforeend", `
+        <div class="min-w-[92px] p-3 rounded-2xl bg-slate-800 border border-slate-700 grid place-items-center">
+          <div class="text-sm font-semibold">${tr("list.more",{n:more})}</div>
+          <div class="text-[10px] text-slate-400">${tr("list.in_family")}</div>
+        </div>
+      `);
+    }
+    const feed=$("feed"); if(feed) feed.innerHTML="";
+  }
+
+  function updateFamilyMap(center){
+    initFamilyMap(); if(!familyMap||!familyGroup) return;
+    familyGroup.clearLayers();
+    const bounds=[];
+    if(userLatLng){
+      const me=L.divIcon({className:"",html:markerHTML(avatarData,44),iconSize:[44,44],iconAnchor:[22,22]});
+      L.marker(userLatLng,{icon:me}).bindPopup(`<b>${escapeHtml(displayName)}</b><br/>${tr("member.active")}`).addTo(familyGroup);
+      bounds.push(userLatLng);
+    }
+    familyOthers.forEach((m,i)=>{
+      const [lat,lng]=scatterLatLng(center,i);
+      const ic=L.divIcon({className:"",html:markerHTML(DEFAULT_AVATAR,40),iconSize:[40,40],iconAnchor:[20,20]});
+      L.marker([lat,lng],{icon:ic}).bindPopup(`<b>${escapeHtml(m.name)}</b><br/>${escapeHtml(m.email)}`).addTo(familyGroup);
+      bounds.push([lat,lng]);
+    });
+    renderPOIs();
+    if(bounds.length) familyMap.fitBounds(bounds,{padding:[20,20]});
+  }
+
+  /* Manage Family modal */
+  const MAX_USERS=6;
+  function openManageFamily(){
+    const modal=$("manageFamilyModal"); if(!modal) return;
+    renderMemberList();
+    modal.classList.remove("is-hidden");
+    modal.classList.add("flex");
+  }
+  function closeManageFamily(){
+    const modal=$("manageFamilyModal"); if(!modal) return;
+    modal.classList.add("is-hidden");
+    modal.classList.remove("flex");
+    renderFamilyCards(); updateFamilyMap(userLatLng || defaultLatLng);
+  }
+  function isValidEmail(e){ return /^[^\s@]+@gmail\.com$/i.test((e||"").trim()); }
+  function memberExists(email){ return familyOthers.some(m=>m.email.toLowerCase()===email.toLowerCase()); }
+
+  function renderMemberList(){
+    const box=$("memberList"); if(!box) return;
+    box.innerHTML="";
+    box.insertAdjacentHTML("beforeend", `
+      <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between">
+        <div>
+          <div class="font-medium">${escapeHtml(displayName)} <span class="text-xs text-slate-400">(you)</span></div>
+          <div class="text-xs text-slate-400">Signed-in device</div>
+        </div>
+        <span class="text-xs px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-600">${tr("tag.owner")}</span>
+      </div>
+    `);
+    familyOthers.forEach(m=>{
+      box.insertAdjacentHTML("beforeend", `
+        <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between">
+          <div>
+            <div class="font-medium">${escapeHtml(m.name)}</div>
+            <div class="text-xs text-slate-400">${escapeHtml(m.email)}</div>
+          </div>
+          <button class="px-2 py-1 rounded-md bg-rose-600 text-white text-xs" data-remove="${m.id}">${tr("btn.remove")}</button>
+        </div>
+      `);
+    });
+  }
+
+  /* Family gate */
+  function refreshFamilyGate(){
+    const mapEl=$("familyMap"), gate=$("familyGate");
+    if(!mapEl||!gate) return;
+    if(!userLatLng){ mapEl.classList.add("family-map-blurred"); gate.classList.add("visible"); }
+    else { mapEl.classList.remove("family-map-blurred"); gate.classList.remove("visible"); }
+  }
+  document.addEventListener("click",e=>{ if(e.target?.id==="btnEnableLocation") startGeo(); });
+
+  /* Geolocation */
+  function startGeo(){
+    initLiveMap(); initFamilyMap();
+    const badge=$("gpsBadge"); if(badge) badge.textContent = tr("dashboard.gps_waiting").replace("…","Locating...");
+    if(!("geolocation" in navigator)){ if(badge) badge.textContent="GPS not supported"; return; }
+    $("liveMap") && ($("liveMap").style.display="block");
+    watchId=navigator.geolocation.watchPosition(pos=>{
+      userLatLng=[pos.coords.latitude,pos.coords.longitude];
+      userMarker && userMarker.setLatLng(userLatLng);
+      accuracyCircle && accuracyCircle.setLatLng(userLatLng).setRadius(Math.min(pos.coords.accuracy||50,200));
+      !lastPos && map && map.setView(userLatLng,16);
+      lastPos=pos; badge && (badge.textContent="Tracking");
+      refreshFamilyGate(); updateFamilyMap(userLatLng);
+    }, err=>{
+      console.warn(err); badge && (badge.textContent="No GPS");
+      !lastPos && updateFamilyMap(defaultLatLng);
+    }, {enableHighAccuracy:true, maximumAge:2000, timeout:10000});
+  }
+  function stopGeo(){
+    if(watchId!=null) navigator.geolocation.clearWatch(watchId);
+    watchId=null; userLatLng=null; lastPos=null;
+    $("gpsBadge") && ($("gpsBadge").textContent="Stopped");
+    $("liveMap") && ($("liveMap").style.display="none");
+    refreshFamilyGate();
+  }
+
+  /* POIs */
+  let pois=[]; const POI_KEY="chonlaew_pois";
+  function loadPOIs(){ try{ pois=JSON.parse(localStorage.getItem(POI_KEY)||"[]"); }catch{ pois=[]; } }
+  function savePOIs(){ localStorage.setItem(POI_KEY, JSON.stringify(pois)); }
+  function ensurePoiGroup(){ if(!familyMap) return; if(!familyPoiGroup) familyPoiGroup=L.featureGroup().addTo(familyMap); }
+  function renderPOIs(){
+    ensurePoiGroup(); if(!familyPoiGroup) return;
+    familyPoiGroup.clearLayers();
+    pois.forEach(p=>{
+      const icon=L.divIcon({
+        className:"poi-pin",
+        html:`<div style="transform:translate(-50%,-50%);display:inline-block;background:#111827;color:#e5e7eb;border:2px solid #a78bfa;padding:3px 8px;border-radius:999px;white-space:pre;font-size:12px;font-weight:600;">${escapeHtml(p.label)}</div>`,
+        iconSize:[1,1], iconAnchor:[0,0]
+      });
+      L.marker([p.lat,p.lng],{icon}).bindPopup(
+        `<div style="min-width:160px"><div style="font-weight:700;white-space:pre;">${escapeHtml(p.label)}</div>
+         <button class="remove-poi" data-id="${p.id}" style="margin-top:6px;padding:6px 10px;border-radius:10px;background:#ef4444;color:#fff;font-weight:600;">${tr("btn.remove")}</button></div>`
+      ).addTo(familyPoiGroup);
+    });
+  }
+  function addPOI(label,latlng){
+    const id=`${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    pois.push({id,label,lat:latlng.lat,lng:latlng.lng});
+    savePOIs(); renderPOIs(); alert(`${tr("btn.add_plus").replace(' +','')}: ${label}`);
+  }
+  function attachFamilyMapClick(){
+    if(!familyMap || familyMap.__poiClickAttached) return;
+    familyMap.on("click",ev=>{
+      if(!poiPlaceLabel) return;
+      addPOI(poiPlaceLabel, ev.latlng);
+      poiPlaceLabel=null; familyMap.getContainer().style.cursor="";
+    });
+    familyMap.__poiClickAttached=true;
+  }
+  document.addEventListener("click",e=>{
+    if(e.target?.id==="btnAddPOI"){
+      if(!familyMap){ alert("Map not ready"); return; }
+      if(!userLatLng){ alert(curLang==="th"?"กรุณาเปิดตำแหน่งก่อน":"Enable location first"); refreshFamilyGate(); return; }
+      const label=prompt(curLang==="th"?"ชื่อสถานที่ (เช่น บ้าน โรงเรียน ออฟฟิศ)":"Place name (e.g., Home, School, Office):");
+      if(label==null || label==="") return;
+      poiPlaceLabel=label; familyMap.getContainer().style.cursor="crosshair";
+      alert((curLang==="th"?"แตะบนแผนที่เพื่อวาง: ":"Tap on the map to place: ") + label);
+    }
+    const rm=e.target?.closest?.(".remove-poi");
+    if(rm){ const id=rm.dataset.id; pois=pois.filter(p=>p.id!==id); savePOIs(); renderPOIs(); alert(curLang==="th"?"ลบแล้ว":"Removed"); }
+  });
+
+  /* Pricing */
+  const PRICING={ premium:159, family:559 };
+  let billing="monthly";
+  const calc = m => billing==="monthly" ? m : (m*12 - m*2);
+  function refreshPrice(){
+    $("pricePremium") && ( $("pricePremium").textContent = calc(PRICING.premium).toLocaleString("en-US") );
+    $("priceFamily")  && ( $("priceFamily").textContent  = calc(PRICING.family).toLocaleString("en-US") );
+    $("unitPremium") && ( $("unitPremium").textContent = (curLang==="th" ? "/ เดือน" : "/ month") );
+    $("unitFamily")  && ( $("unitFamily").textContent  = (curLang==="th" ? "/ เดือน" : "/ month") );
+    $("btnMonthly") && $("btnMonthly").classList.toggle("active", billing==="monthly");
+    $("btnYearly")  && $("btnYearly").classList.toggle("active",  billing==="yearly");
+  }
+
+  /* SOS */
+  function startCountdown(){
+    let t=10; $("bigCountdown") && ($("bigCountdown").textContent=t);
+    if(window.__alertTimer) clearInterval(window.__alertTimer);
+    window.__alertTimer=setInterval(()=>{
+      t--; $("bigCountdown") && ($("bigCountdown").textContent=t);
+      if(t<=0){ clearInterval(window.__alertTimer); showScreen("#dashboard"); }
+    },1000);
+  }
+  const slideBtn=$("slideBtn"), slideArea=$("slideArea");
+  let sliding=false, startX=0, curX=0;
+  function sliderMax(){ return (slideArea?.offsetWidth||0) - (slideBtn?.offsetWidth||0); }
+  function setTranslate(x){ slideBtn && (slideBtn.style.transform=`translateX(${x}px)`); }
+  function confirmEmergency(){
+    if(slideBtn){ slideBtn.style.background="#22c55e"; slideBtn.textContent="✔"; }
+    setTimeout(()=>{ alert("✅"); showScreen("#dashboard"); },300);
+    if(window.__alertTimer) clearInterval(window.__alertTimer);
+  }
+  function onStart(x){ sliding=true; startX=x - curX; }
+  function onMove(x){
+    if(!sliding) return;
+    curX = x - startX;
+    if(curX<0) curX=0;
+    const max=sliderMax();
+    if(curX>max) curX=max;
+    setTranslate(curX);
+    if(curX>=max-2){ sliding=false; confirmEmergency(); }
+  }
+  function onEnd(){ if(!sliding) return; sliding=false; curX=0; setTranslate(0); }
+  if(slideBtn && slideArea){
+    slideBtn.addEventListener("touchstart", e=>onStart(e.touches[0].clientX), {passive:true});
+    slideArea.addEventListener("touchmove",  e=>onMove(e.touches[0].clientX), {passive:true});
+    slideArea.addEventListener("touchend",   onEnd);
+    slideBtn.addEventListener("mousedown", e=>{ e.preventDefault(); onStart(e.clientX); });
+    window.addEventListener("mousemove", e=>onMove(e.clientX));
+    window.addEventListener("mouseup", onEnd);
+  }
+  function resetSlider(){ sliding=false; curX=0; setTranslate(0); if(slideBtn){ slideBtn.style.background="#ef4444"; slideBtn.textContent="➡"; } }
+
+  /* Bindings */
+  $("btnMonthly") && ($("btnMonthly").onclick=()=>{ billing="monthly"; refreshPrice(); });
+  $("btnYearly")  && ($("btnYearly").onclick =()=>{ billing="yearly";  refreshPrice(); });
+  $("btnSOS") && ($("btnSOS").onclick=()=>{ showScreen("#alert"); startCountdown(); resetSlider(); });
+  $("btnCancelAlert") && ($("btnCancelAlert").onclick=()=>{ showScreen("#dashboard"); });
+  $("btnStart") && ($("btnStart").onclick=()=>{ startGeo(); running=true; $("btnStart").disabled=true; $("btnStop").disabled=false; });
+  $("btnStop")  && ($("btnStop").onclick =()=>{ stopGeo();  running=false; $("btnStart").disabled=false; $("btnStop").disabled=true; });
+
+  const logoutModal=$("logoutModal");
+  $("btnLogout") && $("btnLogout").addEventListener("click",()=>{ logoutModal && (logoutModal.classList.remove("is-hidden"), logoutModal.classList.add("flex")); });
+  $("cancelLogout") && $("cancelLogout").addEventListener("click",()=>{ logoutModal && (logoutModal.classList.add("is-hidden"), logoutModal.classList.remove("flex")); });
+  $("confirmLogout") && $("confirmLogout").addEventListener("click",()=>{
+    logoutModal && (logoutModal.classList.add("is-hidden"), logoutModal.classList.remove("flex"));
+    stopGeo(); running=false; showScreen("#welcome");
+    $("btnStart") && ($("btnStart").disabled=false); $("btnStop") && ($("btnStop").disabled=true);
+  });
+
+  $("btnManageFamily") && $("btnManageFamily").addEventListener("click", openManageFamily);
+  $("closeManageFamily") && $("closeManageFamily").addEventListener("click", closeManageFamily);
+  $("memberList") && $("memberList").addEventListener("click",(e)=>{
+    const id=e.target?.dataset?.remove;
+    if(!id) return;
+    familyOthers = familyOthers.filter(m=>m.id!==id);
+    saveFamily();
+    renderMemberList();
+    renderFamilyCards(); updateFamilyMap(userLatLng || defaultLatLng);
+  });
+  $("btnAddMember") && $("btnAddMember").addEventListener("click", ()=>{
+    const name = ($("mfName")?.value||"").trim();
+    const email = ($("mfEmail")?.value||"").trim();
+    if(!name){ alert(curLang==="th"?"กรุณากรอกชื่อ":"Please enter name"); return; }
+    if(!email){ alert(curLang==="th"?"กรุณากรอกอีเมล":"Please enter email"); return; }
+    if(!isValidEmail(email)){ alert(curLang==="th"?"ต้องเป็น Gmail เท่านั้น (someone@gmail.com)":"Gmail only (someone@gmail.com)"); return; }
+    const total = 1 + familyOthers.length;
+    if(total >= MAX_USERS){ alert(curLang==="th"?"ถึงจำนวนสมาชิกสูงสุด 6 คนแล้ว":"Reached 6-user limit"); return; }
+    if(memberExists(email)){ alert(curLang==="th"?"อีเมลนี้ถูกเพิ่มแล้ว":"Email already added"); return; }
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    familyOthers.push({id, name, email});
+    saveFamily();
+    $("mfName") && ($("mfName").value=""); $("mfEmail") && ($("mfEmail").value="");
+    renderMemberList();
+    renderFamilyCards(); updateFamilyMap(userLatLng || defaultLatLng);
+  });
+
+  $("inpPhoto") && $("inpPhoto").addEventListener("change", (e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    const reader=new FileReader();
+    reader.onload=()=>{ 
+      avatarData=reader.result; 
+      $("avatarPreview") && ($("avatarPreview").src=avatarData); 
+      $("profileAvatar") && ($("profileAvatar").src=avatarData); 
+    };
+    reader.readAsDataURL(f);
+  });
+  $("btnRemovePhoto") && $("btnRemovePhoto").addEventListener("click", ()=>{
+    avatarData=DEFAULT_AVATAR; 
+    $("avatarPreview") && ($("avatarPreview").src=avatarData); 
+    $("profileAvatar") && ($("profileAvatar").src=avatarData);
+  });
+  $("btnSaveAccount") && $("btnSaveAccount").addEventListener("click", saveAccount);
+  $("btnResetAccount") && $("btnResetAccount").addEventListener("click", ()=>{
+    localStorage.removeItem(ACC_KEY);
+    displayName="You"; avatarData=DEFAULT_AVATAR;
+    loadAccount(); renderFamilyCards(); updateFamilyMap(userLatLng || defaultLatLng);
+  });
+
+  /* Init */
+  function protocolBadge(){
+    const ok = location.protocol==="https:" || ["localhost","127.0.0.1"].includes(location.hostname);
+    const b=$("statusBadge"); if(!ok && b){ b.textContent = (curLang==="th"?"เดโม (HTTP)":"Demo (HTTP)"); }
+  }
+  function firstShow(){ const target = location.hash || "#welcome"; showScreen(target); }
+
+  protocolBadge();
+  loadAccount();
+  loadFamily();
+  loadPOIs();
+  applyI18n();
+  renderFamilyCards();
+  firstShow();
+
+  // update Up-to badge once at start with current lang
+  $("badgeUpTo") && ($("badgeUpTo").textContent = tr("badge.up_to",{n:6}));
+});
+</script>
+</body>
+</html>
